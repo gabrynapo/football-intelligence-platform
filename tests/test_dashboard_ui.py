@@ -31,6 +31,29 @@ class FakeSource:
 
 @unittest.skipUnless(importlib.util.find_spec("streamlit"), "Install dashboard extra for UI tests")
 class DashboardUITests(unittest.TestCase):
+    def test_historical_standings_error_and_targeted_retry(self):
+        from streamlit.testing.v1 import AppTest
+        calls = []
+
+        class HistoricSource(FakeSource):
+            def matches(self, season, refresh=False):
+                calls.append(("matches", season, refresh))
+                return Dataset(SAMPLE, "2026-10-13T12:00:00+00:00")
+
+            def standings(self, season, refresh=False):
+                calls.append(("standings", season, refresh))
+                return Dataset(None, None, "Accesso negato per questa stagione.", error_code="access_denied", http_status=403)
+
+        with patch("football_intelligence.dashboard_data.DashboardSource", HistoricSource):
+            app = AppTest.from_file(str(ROOT / "app" / "streamlit_app.py"), default_timeout=15).run()
+            app.sidebar.selectbox[0].select(2025).run()
+            self.assertFalse(app.exception)
+            self.assertTrue(any("Classifica 2025/26: Accesso negato" in w.value for w in app.warning))
+            self.assertTrue(any("HTTP 403" in c.value for c in app.caption))
+            next(b for b in app.button if b.label == "Ricarica classifica").click().run()
+            self.assertFalse(app.exception)
+            self.assertEqual(calls[-2:], [("matches", 2025, False), ("standings", 2025, True)])
+
     def test_render_filters_comparison_and_denied_season(self):
         from streamlit.testing.v1 import AppTest
         with patch("football_intelligence.dashboard_data.DashboardSource", FakeSource):

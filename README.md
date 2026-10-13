@@ -27,10 +27,6 @@ comando. Su Linux/macOS usare `.venv/bin/python` al posto di `.venv\Scripts\pyth
 - Calendario filtrabile con esportazione CSV, classifica con Brighton evidenziato.
 - Confronto fino a quattro stagioni a parità di partite giocate.
 
-**Verificati con il tuo account il 13 ottobre 2026:** 2026/27 (6 risultati Brighton),
-2025/26 e 2024/25 (38 risultati Brighton ciascuna). Le altre stagioni del catalogo
-restano da verificare: un diniego viene mostrato senza inventare dati.
-
 La cache locale dura un'ora per risultati/classifiche e 24 ore per il catalogo;
 filtrare tabelle e cambiare scheda non causa nuove chiamate entro questi intervalli.
 Il pulsante di aggiornamento ha un intervallo minimo di 60 secondi. Le richieste

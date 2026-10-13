@@ -19,6 +19,8 @@ class Dataset:
     fetched_at: str | None
     error: str | None = None
     stale: bool = False
+    error_code: str | None = None
+    http_status: int | None = None
 
 
 class DashboardSource:
@@ -64,7 +66,8 @@ class DashboardSource:
                 now = self.clock()
                 # Even manual refresh has a 60-second cooldown.
                 if now - cached.get("checked_at", 0) < 60 or (not refresh and now < cached.get("expires_at", 0)):
-                    return Dataset(data, fetched_at, cached.get("error"), bool(cached.get("error") and data))
+                    return Dataset(data, fetched_at, cached.get("error"), bool(cached.get("error") and data),
+                                   cached.get("error_code"), cached.get("http_status"))
                 blocked = self._read(self.state / "blocked.json").get("until", 0)
                 if now < blocked:
                     raise StopProbe("Quota momentaneamente esaurita. Riprova tra circa un minuto.")
@@ -102,10 +105,19 @@ class DashboardSource:
                 # Negative cache avoids repeated denied requests on every widget rerun.
                 ttl = 60 if outcome in ("rate_limited", "http_error") else (86400 if resource == "competition" else 3600)
                 self._write(path, {"data": data, "fetched_at": fetched_at, "checked_at": self.clock(),
-                                   "expires_at": self.clock() + ttl, "error": error})
-                return Dataset(data, fetched_at, error, bool(error and data))
-        except (StopProbe, URLError, TimeoutError, OSError, ValueError, TypeError, KeyError, AttributeError):
-            return Dataset(data, fetched_at, "Aggiornamento non riuscito: connessione, quota o risposta non valida. Riprova più tardi.", bool(data))
+                                   "expires_at": self.clock() + ttl, "error": error,
+                                   "error_code": outcome if error else None, "http_status": status})
+                return Dataset(data, fetched_at, error, bool(error and data), outcome if error else None, status)
+        except StopProbe as error:
+            # These are local guard/validation messages, never arbitrary provider bodies.
+            message = str(error).replace(self.token, "[REDACTED]")
+            return Dataset(data, fetched_at, f"Richiesta interrotta: {message}", bool(data), "request_stopped")
+        except (URLError, TimeoutError, ConnectionError):
+            return Dataset(data, fetched_at, "Connessione a football-data.org non riuscita. Riprova: questo errore non dimostra che la stagione sia esclusa dal piano.", bool(data), "connection_error")
+        except OSError:
+            return Dataset(data, fetched_at, "Errore di connessione o di accesso alla cache locale. Riprova e controlla i permessi della cartella del progetto.", bool(data), "io_error")
+        except (ValueError, TypeError, KeyError, AttributeError):
+            return Dataset(data, fetched_at, "Formato della risposta o della cache non valido; impossibile verificare i dati della stagione.", bool(data), "invalid_response")
 
     def catalog(self, refresh=False):
         return self.get("competition", refresh=refresh)

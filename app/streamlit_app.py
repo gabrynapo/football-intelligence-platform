@@ -1,6 +1,7 @@
 """Brighton season dashboard. Launch: streamlit run app/streamlit_app.py."""
 
 from datetime import datetime, timezone
+from base64 import b64encode
 from html import escape
 from pathlib import Path
 import sys
@@ -28,7 +29,7 @@ h1,h2,h3 {letter-spacing:-.035em;}
 [data-testid="stMetricValue"] {font-weight:750; color:#123456;}
 .brand {font-weight:800;font-size:22px;line-height:1.2;margin:8px 0 30px;}
 .brand small {display:block;font-size:10px;letter-spacing:2px;color:#7c8ba1;margin-top:10px;}
-.crest {display:inline-grid;place-items:center;background:#1475e1;color:white;border-radius:50%;width:48px;height:48px;font-size:14px;margin-right:10px;}
+.crest {display:inline-block;width:56px;height:56px;object-fit:contain;vertical-align:middle;margin-right:10px;}
 .hero {background:linear-gradient(115deg,#102c51,#135b9b);border-radius:20px;padding:32px 38px;color:white;margin:5px 0 24px;position:relative;overflow:hidden;}
 .hero:after {content:'';position:absolute;right:-40px;top:-120px;width:430px;height:430px;border:1px solid #ffffff22;border-radius:50%;box-shadow:0 0 0 55px #ffffff05,0 0 0 110px #ffffff04;pointer-events:none;}
 .hero h1 {color:white;font-size:40px;margin:10px 0 4px;font-weight:800;}
@@ -60,6 +61,10 @@ def show_issue(dataset, label):
         st.warning(f"{label}: {dataset.error}" + (" Visualizzi l'ultima copia salvata, non aggiornata." if dataset.stale else ""))
 
 
+def request_standings_refresh():
+    st.session_state["refresh_standings"] = True
+
+
 def card(label, value, sub):
     st.markdown(f'<div class="match-card"><div class="label">{escape(label)}</div><div class="value">{value}</div><div class="sub">{escape(sub)}</div></div>', unsafe_allow_html=True)
 
@@ -73,7 +78,8 @@ def display_matches(rows):
 
 
 with st.sidebar:
-    st.markdown('<div class="brand"><span class="crest">BHA</span> Brighton<small>FOOTBALL INTELLIGENCE</small></div>', unsafe_allow_html=True)
+    logo_data = b64encode((ROOT / "resources" / "logo_brighton.png").read_bytes()).decode("ascii")
+    st.markdown(f'<div class="brand"><img class="crest" src="data:image/png;base64,{logo_data}" alt="Logo Brighton & Hove Albion"> Brighton<small>FOOTBALL INTELLIGENCE</small></div>', unsafe_allow_html=True)
     st.caption("IL TUO OSSERVATORIO SUL CLUB")
 try:
     token = token_from_environment(ROOT / ".env" if (ROOT / ".env").exists() else None)
@@ -106,7 +112,8 @@ st.markdown(f'<div class="hero"><div class="eyebrow">PREMIER LEAGUE / SEASON CEN
 with st.spinner("Caricamento dei risultati e della classifica…"):
     matches = source.matches(season, refresh)
     # If access to the season is denied, do not waste another request on its table.
-    standings = source.standings(season, refresh) if matches.data else None
+    refresh_table = st.session_state.pop("refresh_standings", False)
+    standings = source.standings(season, refresh or refresh_table) if matches.data else None
 show_issue(matches, "Partite")
 if not matches.data:
     st.info("Questa stagione non è disponibile al momento. Seleziona un'altra stagione dalla barra laterale.")
@@ -209,7 +216,16 @@ with fixtures_tab:
 with table_tab:
     st.subheader(f"Premier League · {season_label(season)}")
     if not table:
-        st.info("La classifica del provider non è disponibile per questa stagione.")
+        if standings and standings.error:
+            st.warning(f"Classifica {season_label(season)}: {standings.error}")
+            if standings.http_status:
+                st.caption(f"Risposta del servizio: HTTP {standings.http_status}.")
+        elif standings and standings.data is not None:
+            st.info(f"Per il {season_label(season)}, football-data.org ha restituito una risposta senza righe nella classifica generale. I risultati delle partite possono essere comunque disponibili.")
+        else:
+            st.info(f"La classifica {season_label(season)} non è stata caricata. Puoi riprovare senza aggiornare i risultati delle partite.")
+        st.button("Ricarica classifica", on_click=request_standings_refresh)
+        st.caption("L'aggiornamento rispetta il limite richieste e un intervallo minimo di 60 secondi dall'ultima risposta salvata.")
     else:
         standings_frame = pd.DataFrame([{"Pos": r.get("position"), "Squadra": r.get("team", {}).get("name"),
                                          "G": r.get("playedGames"), "V": r.get("won"), "P": r.get("draw"), "S": r.get("lost"),

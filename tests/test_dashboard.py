@@ -5,6 +5,7 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from urllib.error import URLError
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from football_intelligence.analytics import match_rows, summary
@@ -112,6 +113,31 @@ class CacheTests(unittest.TestCase):
     def test_wrong_season_never_cached_as_valid(self):
         self.responses = [(200, {}, {**SAMPLE, "filters": {"season": "2025"}})]
         self.assertIsNone(self.source().matches(2026).data)
+
+    def test_standings_denial_preserves_http_cause_in_cache(self):
+        self.responses = [(403, {}, {"message": "Restricted season"})]
+        source = self.source()
+        first = source.standings(2022)
+        second = source.standings(2022)
+        self.assertEqual((first.error_code, first.http_status), ("access_denied", 403))
+        self.assertEqual((second.error_code, second.http_status), ("access_denied", 403))
+        self.assertEqual(self.calls, 1)
+
+    def test_network_failure_does_not_claim_season_unavailable(self):
+        def fail(*args):
+            raise URLError("private error text")
+        source = DashboardSource("test-token", root=self.root, send=fail)
+        result = source.standings(2025)
+        self.assertEqual(result.error_code, "connection_error")
+        self.assertNotIn("private error text", result.error)
+        self.assertIsNone(result.http_status)
+
+    def test_empty_standings_is_not_access_denied(self):
+        self.responses = [(200, {}, {"competition": {"code": "PL"}, "filters": {"season": "2025"}, "standings": []})]
+        result = self.source().standings(2025)
+        self.assertIsNone(result.error)
+        self.assertEqual(result.http_status, 200)
+        self.assertEqual(result.data["standings"], [])
 
 
 if __name__ == "__main__":

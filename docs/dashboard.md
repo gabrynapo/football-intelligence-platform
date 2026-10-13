@@ -61,6 +61,13 @@ Non ci sono xG o probabilità predittive; la forma mobile è descrittiva.
 Osservazioni restituite dall'API al momento della verifica, non valori statici
 codificati nell'app. La classifica 2026/27 contiene 20 righe.
 
+Verifica separata delle classifiche storiche: 2025/26, 2024/25 e 2023/24
+restituiscono 20 righe; per 2022/23 il token riceve HTTP 403 (accesso negato).
+Questo controllo non prova la disponibilità delle classifiche precedenti.
+La scheda Classifica distingue ora un diniego HTTP, un errore di connessione e
+una risposta senza righe, riportando l'annata selezionata. Il pulsante
+«Ricarica classifica» aggiorna solo la classifica, rispettando il cooldown.
+
 Test: `.venv\Scripts\python.exe -m unittest discover -s tests -v`.
 I test offline verificano punteggi casa/trasferta, null e stati non conclusi,
 duplicati, cache, refresh, dinieghi, quota e interazione Streamlit tramite AppTest.
