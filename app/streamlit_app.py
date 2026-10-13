@@ -18,6 +18,7 @@ from football_intelligence.api import StopProbe
 from football_intelligence.dashboard_data import DashboardSource
 from football_intelligence.football_data import token_from_environment
 from charts import form_chart, goals_chart, points_chart
+from squad_view import render_squad
 
 ROME = ZoneInfo("Europe/Rome")
 st.set_page_config(page_title="Brighton | Football Intelligence", page_icon="⚽", layout="wide")
@@ -41,7 +42,7 @@ h1,h2,h3 {letter-spacing:-.035em;}
 .match-card .value {font-size:19px;font-weight:750;color:#142f50;line-height:1.35;}
 .match-card .sub {font-size:12px;color:#6c7e97;margin-top:8px;}
 .form {display:inline-block;padding:6px 10px;border-radius:7px;margin:0 5px 3px 0;font-size:13px;font-weight:800;}
-.form-V {background:#dff4ec;color:#197355}.form-P {background:#fff1d6;color:#986c1d}.form-S {background:#fde6e4;color:#b14641}
+.form-W {background:#dff4ec;color:#197355}.form-D {background:#fff1d6;color:#986c1d}.form-L {background:#fde6e4;color:#b14641}
 div[data-testid="stTabs"] {margin-top:24px;}
 button[data-baseweb="tab"] {font-size:15px;}
 @media(max-width:700px){.hero{padding:24px}.hero h1{font-size:29px}.block-container{padding-top:1rem}}
@@ -49,7 +50,7 @@ button[data-baseweb="tab"] {font-size:15px;}
 
 
 def local_date(date):
-    return date.astimezone(ROME).strftime("%d/%m/%Y · %H:%M") if date else "Data da definire"
+    return date.astimezone(ROME).strftime("%d/%m/%Y · %H:%M") if date else "Date to be confirmed"
 
 
 def stamp(value):
@@ -58,7 +59,7 @@ def stamp(value):
 
 def show_issue(dataset, label):
     if dataset.error:
-        st.warning(f"{label}: {dataset.error}" + (" Visualizzi l'ultima copia salvata, non aggiornata." if dataset.stale else ""))
+        st.warning(f"{label}: {dataset.error}" + (" Showing the last saved copy; it is not up to date." if dataset.stale else ""))
 
 
 def request_standings_refresh():
@@ -70,177 +71,179 @@ def card(label, value, sub):
 
 
 def display_matches(rows):
-    states = {"FINISHED": "Conclusa", "SCHEDULED": "In programma", "TIMED": "In programma", "POSTPONED": "Rinviata",
-              "CANCELLED": "Annullata", "IN_PLAY": "In corso", "PAUSED": "Intervallo", "SUSPENDED": "Sospesa"}
-    return pd.DataFrame([{"Data (Roma)": local_date(r["date"]), "Giornata": r["matchday"], "Avversaria": r["opponent"],
-                          "Campo": r["venue"], "Risultato BHA": f"{r['gf']}–{r['ga']}" if r["played"] else "—",
-                          "Esito": r["result"] or "—", "Punti": r["points"], "Stato": states.get(r["status"], r["status"])} for r in rows])
+    states = {"FINISHED": "Finished", "SCHEDULED": "Scheduled", "TIMED": "Scheduled", "POSTPONED": "Postponed",
+              "CANCELLED": "Cancelled", "IN_PLAY": "In progress", "PAUSED": "Half-time", "SUSPENDED": "Suspended"}
+    return pd.DataFrame([{"Date (Rome)": local_date(r["date"]), "Matchday": r["matchday"], "Opponent": r["opponent"],
+                          "Venue": r["venue"], "BHA score": f"{r['gf']}–{r['ga']}" if r["played"] else "—",
+                          "Result": r["result"] or "—", "Points": r["points"], "Status": states.get(r["status"], r["status"])} for r in rows])
 
 
 with st.sidebar:
     logo_data = b64encode((ROOT / "resources" / "logo_brighton.png").read_bytes()).decode("ascii")
-    st.markdown(f'<div class="brand"><img class="crest" src="data:image/png;base64,{logo_data}" alt="Logo Brighton & Hove Albion"> Brighton<small>FOOTBALL INTELLIGENCE</small></div>', unsafe_allow_html=True)
-    st.caption("IL TUO OSSERVATORIO SUL CLUB")
+    st.markdown(f'<div class="brand"><img class="crest" src="data:image/png;base64,{logo_data}" alt="Brighton & Hove Albion logo"> Brighton<small>FOOTBALL INTELLIGENCE</small></div>', unsafe_allow_html=True)
+    st.caption("YOUR VIEW OF THE CLUB")
 try:
     token = token_from_environment(ROOT / ".env" if (ROOT / ".env").exists() else None)
 except (OSError, StopProbe):
-    st.error("Impossibile leggere la configurazione locale. Controlla FOOTBALL_DATA_TOKEN in .env.")
+    st.error("Unable to read the local configuration. Check FOOTBALL_DATA_TOKEN in .env.")
     st.stop()
 source = DashboardSource(token)
-with st.spinner("Caricamento delle stagioni…"):
+with st.spinner("Loading seasons…"):
     catalog = source.catalog()
-show_issue(catalog, "Stagioni")
+show_issue(catalog, "Seasons")
 if not catalog.data:
-    st.info("La dashboard richiede un token football-data.org valido. Nessun dato dimostrativo viene usato.")
+    st.info("The dashboard requires a valid football-data.org token. No demo data is used.")
     st.stop()
 try:
     seasons = season_options(catalog.data)
 except (KeyError, TypeError, ValueError):
-    st.error("Il catalogo stagioni ricevuto non è valido.")
+    st.error("The season catalogue returned by the provider is invalid.")
     st.stop()
 with st.sidebar:
-    season = st.selectbox("Stagione", seasons, format_func=season_label)
-    st.caption("Le stagioni sono elencate nel catalogo. L'accesso dipende dal piano del tuo account.")
-    refresh = st.button("↻ Aggiorna stagione", width="stretch")
+    season = st.selectbox("Season", seasons, format_func=season_label)
+    st.caption("Seasons are listed in the catalogue. Access depends on your account plan.")
+    refresh = st.button("↻ Refresh season", width="stretch")
     st.divider()
-    st.markdown("**Un club, ogni prospettiva.**")
-    st.caption("Segui risultati, punti e gol. Confronta le stagioni rispetto alle partite effettivamente giocate.")
+    st.markdown("**One club, every perspective.**")
+    st.caption("Track results, points and goals. Compare seasons by matches played.")
     st.divider()
-    st.caption("Dati: football-data.org\n\nRisultati in ritardo · Orari Europe/Rome")
+    st.caption("Data: football-data.org\n\nDelayed results · Times in Europe/Rome")
 
-st.markdown(f'<div class="hero"><div class="eyebrow">PREMIER LEAGUE / SEASON CENTRE</div><h1>Il Brighton, partita dopo partita.</h1><p>Risultati, forma e numeri per leggere la stagione degli Albion.</p><span class="pill">STAGIONE {season_label(season)}</span> <span class="pill">BRIGHTON & HOVE ALBION</span></div>', unsafe_allow_html=True)
-with st.spinner("Caricamento dei risultati e della classifica…"):
+st.markdown(f'<div class="hero"><div class="eyebrow">PREMIER LEAGUE / SEASON CENTRE</div><h1>Brighton, match by match.</h1><p>Results, form and numbers behind the Albion season.</p><span class="pill">SEASON {season_label(season)}</span> <span class="pill">BRIGHTON & HOVE ALBION</span></div>', unsafe_allow_html=True)
+with st.spinner("Loading results and standings…"):
     matches = source.matches(season, refresh)
     # If access to the season is denied, do not waste another request on its table.
     refresh_table = st.session_state.pop("refresh_standings", False)
     standings = source.standings(season, refresh or refresh_table) if matches.data else None
-show_issue(matches, "Partite")
+show_issue(matches, "Matches")
 if not matches.data:
-    st.info("Questa stagione non è disponibile al momento. Seleziona un'altra stagione dalla barra laterale.")
+    st.info("This season is currently unavailable. Select another season in the sidebar.")
+    render_squad(source)
     st.stop()
 if standings:
-    show_issue(standings, "Classifica")
+    show_issue(standings, "Standings")
 try:
     rows = match_rows(matches.data)
 except (ValueError, KeyError, TypeError):
-    st.error("I risultati contengono dati incoerenti. Il riepilogo è sospeso per evitare statistiche errate.")
+    st.error("The results contain inconsistent data. The summary is unavailable to avoid displaying incorrect statistics.")
     st.stop()
 if not rows:
-    st.info("Nessuna partita Brighton restituita per questa stagione.")
+    st.info("No Brighton matches were returned for this season.")
+    render_squad(source)
     st.stop()
 played = [r for r in rows if r["played"]]
 stats = summary(rows)
 table = total_table(standings.data if standings else None)
 club_row = next((r for r in table if r.get("team", {}).get("id") == BRIGHTON_ID), {})
-st.caption(f"Partite aggiornate: {stamp(matches.fetched_at)} · Classifica: {stamp(standings.fetched_at) if standings else 'non disponibile'}")
+st.caption(f"Matches updated: {stamp(matches.fetched_at)} · Standings: {stamp(standings.fetched_at) if standings else 'not available'}")
 invalid = sum(r["status"] == "FINISHED" and not r["played"] for r in rows)
 if invalid:
-    st.warning(f"{invalid} partite concluse hanno dati incompleti o incoerenti: escluse dai calcoli.")
+    st.warning(f"{invalid} finished matches have incomplete or inconsistent data and are excluded from calculations.")
 if club_row and club_row.get("points") != stats["points"]:
-    st.info("I punti calcolati dai risultati differiscono dalla classifica del provider. Gli aggiornamenti o eventuali rettifiche possono avere tempi diversi.")
+    st.info("Points calculated from results differ from the provider's standings. Updates or adjustments may arrive at different times.")
 metrics = st.columns(5)
 for col, label, value, detail in zip(metrics,
-    ["Punti conquistati", "Posizione", "Punti / partita", "Gol fatti", "Gol subiti"],
-    [stats["points"] if played else "—", f"{club_row['position']}°" if club_row.get("position") else "—",
+    ["Points earned", "Position", "Points / match", "Goals for", "Goals against"],
+    [stats["points"] if played else "—", club_row["position"] if club_row.get("position") else "—",
      f"{stats['ppg']:.2f}" if played else "—", stats["gf"] if played else "—", stats["ga"] if played else "—"],
-    [f"{stats['played']} partite concluse", "Classifica del provider", "Media stagionale", "Totale Brighton", "Totale Brighton"]):
+    [f"{stats['played']} finished matches", "Provider standings", "Season average", "Brighton total", "Brighton total"]):
     col.metric(label, value, help=detail)
 st.write("")
 last_col, form_col, next_col = st.columns(3)
 with last_col:
     if played:
         last = played[-1]
-        card("Ultimo risultato", f"{last['gf']} – {last['ga']} · {escape(last['opponent'])}", f"Brighton {last['venue'].lower()} · {local_date(last['date'])}")
+        card("Latest result", f"{last['gf']} – {last['ga']} · {escape(last['opponent'])}", f"Brighton {last['venue'].lower()} · {local_date(last['date'])}")
     else:
-        card("Ultimo risultato", "Stagione da giocare", "Nessuna partita conclusa disponibile")
+        card("Latest result", "Season yet to start", "No finished matches available")
 with form_col:
     form = "".join(f'<span class="form form-{r["result"]}">{r["result"]}</span>' for r in played[-5:])
-    card("Forma · ultime 5", form or "—", "Vittoria · Pareggio · Sconfitta | da sinistra a destra")
+    card("Form · last 5", form or "—", "Win · Draw · Loss | left to right")
 with next_col:
     now = datetime.now(timezone.utc)
     upcoming = [r for r in rows if r["status"] in ("SCHEDULED", "TIMED") and r["date"] and r["date"] > now]
     if upcoming:
         nxt = upcoming[0]
-        card("Prossima partita", escape(nxt["opponent"]), f"{nxt['venue']} · {local_date(nxt['date'])}")
+        card("Next match", escape(nxt["opponent"]), f"{nxt['venue']} · {local_date(nxt['date'])}")
     else:
-        card("Prossima partita", "Nessuna gara in programma", "Nel calendario restituito per la stagione")
+        card("Next match", "No upcoming matches", "In the schedule returned for this season")
 
-overview, fixtures_tab, table_tab, compare = st.tabs(["Panoramica", "Partite", "Classifica", "Confronto stagioni"])
+overview, fixtures_tab, table_tab, compare, squad_tab = st.tabs(["Overview", "Matches", "Standings", "Season comparison", "Current squad"])
 with overview:
     if not played:
-        st.info("I grafici saranno disponibili dopo le prime partite concluse.")
+        st.info("Charts will be available after the first matches are completed.")
     else:
         left, right = st.columns([1.25, 1])
         with left, st.container(border=True):
-            st.subheader("La corsa ai punti")
-            st.caption("Punti cumulati, nell'ordine in cui le partite sono state giocate.")
+            st.subheader("The race for points")
+            st.caption("Cumulative points, in the order matches were played.")
             st.plotly_chart(points_chart({season_label(season): rows}), width="stretch", key="points")
         with right, st.container(border=True):
-            st.subheader("Attacco e difesa")
-            st.caption("Gol fatti e subiti in ogni partita conclusa.")
+            st.subheader("Attack and defence")
+            st.caption("Goals scored and conceded in each completed match.")
             st.plotly_chart(goals_chart(rows), width="stretch", key="goals")
         left, right = st.columns([1.25, 1])
         with left, st.container(border=True):
-            st.subheader("Il momento della squadra")
-            st.caption("Punti per gara nelle ultime 5 partite; a inizio stagione, nelle gare disponibili.")
+            st.subheader("Recent form")
+            st.caption("Points per match over the last 5 matches, or the available matches early in the season.")
             st.plotly_chart(form_chart(rows), width="stretch", key="form")
         with right, st.container(border=True):
-            st.subheader("Casa e trasferta")
+            st.subheader("Home and away")
             split = []
-            for venue in ("Casa", "Trasferta"):
+            for venue in ("Home", "Away"):
                 s = summary([r for r in rows if r["venue"] == venue])
-                split.append({"Campo": venue, "G": s["played"], "V": s["wins"], "P": s["draws"], "S": s["losses"],
-                              "Pt": s["points"], "GF": s["gf"], "GS": s["ga"], "Pt/G": round(s["ppg"], 2) if s["ppg"] is not None else None})
+                split.append({"Venue": venue, "Pld": s["played"], "W": s["wins"], "D": s["draws"], "L": s["losses"],
+                              "Pts": s["points"], "GF": s["gf"], "GA": s["ga"], "Pts/MP": round(s["ppg"], 2) if s["ppg"] is not None else None})
             st.dataframe(pd.DataFrame(split), hide_index=True, width="stretch")
-            st.caption("G = giocate · V/P/S = vittorie/pareggi/sconfitte · Pt/G = punti per gara")
+            st.caption("Pld = played · W/D/L = wins/draws/losses · Pts/MP = points per match")
             a, b = st.columns(2)
-            a.metric("Vittorie", f"{stats['wins']} / {stats['played']}")
-            b.metric("Clean sheet", stats["clean_sheets"])
+            a.metric("Wins", f"{stats['wins']} / {stats['played']}")
+            b.metric("Clean sheets", stats["clean_sheets"])
 
 with fixtures_tab:
-    st.subheader("Il calendario degli Albion")
+    st.subheader("Albion's fixtures")
     field, state = st.columns(2)
-    venue = field.selectbox("Campo", ["Tutti", "Casa", "Trasferta"])
-    phase = state.selectbox("Partite", ["Tutte", "Concluse", "Da giocare / altri stati"])
-    filtered = [r for r in rows if (venue == "Tutti" or r["venue"] == venue)
-                and (phase == "Tutte" or r["played"] == (phase == "Concluse"))]
+    venue = field.selectbox("Venue", ["All", "Home", "Away"])
+    phase = state.selectbox("Matches", ["All", "Finished", "Upcoming / other statuses"])
+    filtered = [r for r in rows if (venue == "All" or r["venue"] == venue)
+                and (phase == "All" or r["played"] == (phase == "Finished"))]
     frame = display_matches(filtered)
     if frame.empty:
-        st.info("Nessuna partita corrisponde ai filtri.")
+        st.info("No matches match the filters.")
     else:
         st.dataframe(frame, hide_index=True, width="stretch", height=480)
-        st.download_button("Scarica le partite filtrate · CSV", frame.to_csv(index=False).encode("utf-8-sig"),
-                           file_name=f"brighton-{season}-partite.csv", mime="text/csv")
-    st.caption("Il punteggio è sempre espresso dal punto di vista del Brighton. I dati non disponibili restano vuoti.")
+        st.download_button("Download filtered matches · CSV", frame.to_csv(index=False).encode("utf-8-sig"),
+                           file_name=f"brighton-{season}-matches.csv", mime="text/csv")
+    st.caption("Scores are always shown from Brighton's perspective. Unavailable data is left blank.")
 
 with table_tab:
     st.subheader(f"Premier League · {season_label(season)}")
     if not table:
         if standings and standings.error:
-            st.warning(f"Classifica {season_label(season)}: {standings.error}")
+            st.warning(f"Standings {season_label(season)}: {standings.error}")
             if standings.http_status:
-                st.caption(f"Risposta del servizio: HTTP {standings.http_status}.")
+                st.caption(f"Service response: HTTP {standings.http_status}.")
         elif standings and standings.data is not None:
-            st.info(f"Per il {season_label(season)}, football-data.org ha restituito una risposta senza righe nella classifica generale. I risultati delle partite possono essere comunque disponibili.")
+            st.info(f"For {season_label(season)}, football-data.org returned no rows in the overall standings. Match results may still be available.")
         else:
-            st.info(f"La classifica {season_label(season)} non è stata caricata. Puoi riprovare senza aggiornare i risultati delle partite.")
-        st.button("Ricarica classifica", on_click=request_standings_refresh)
-        st.caption("L'aggiornamento rispetta il limite richieste e un intervallo minimo di 60 secondi dall'ultima risposta salvata.")
+            st.info(f"The {season_label(season)} standings could not be loaded. You can retry without refreshing match results.")
+        st.button("Reload standings", on_click=request_standings_refresh)
+        st.caption("Refresh respects the request limit and a minimum interval of 60 seconds since the last saved response.")
     else:
-        standings_frame = pd.DataFrame([{"Pos": r.get("position"), "Squadra": r.get("team", {}).get("name"),
-                                         "G": r.get("playedGames"), "V": r.get("won"), "P": r.get("draw"), "S": r.get("lost"),
-                                         "GF": r.get("goalsFor"), "GS": r.get("goalsAgainst"), "DG": r.get("goalDifference"),
-                                         "Punti": r.get("points")} for r in table])
-        styled = standings_frame.style.apply(lambda row: ["background-color: #e3efff; color: #123456; font-weight: bold" if "Brighton" in str(row["Squadra"]) else ""] * len(row), axis=1)
+        standings_frame = pd.DataFrame([{"Pos": r.get("position"), "Team": r.get("team", {}).get("name"),
+                                         "Pld": r.get("playedGames"), "W": r.get("won"), "D": r.get("draw"), "L": r.get("lost"),
+                                         "GF": r.get("goalsFor"), "GA": r.get("goalsAgainst"), "GD": r.get("goalDifference"),
+                                         "Points": r.get("points")} for r in table])
+        styled = standings_frame.style.apply(lambda row: ["background-color: #e3efff; color: #123456; font-weight: bold" if "Brighton" in str(row["Team"]) else ""] * len(row), axis=1)
         st.dataframe(styled, hide_index=True, width="stretch", height=740)
-        st.caption("Classifica restituita dal provider. Non viene ricostruita applicando criteri di spareggio arbitrari.")
+        st.caption("Standings as returned by the provider, without applying custom tie-break rules.")
 
 with compare:
-    st.subheader("Come cambia il Brighton")
-    st.caption("Confronta fino a tre stagioni con quella selezionata. I dati storici vengono richiesti solo premendo il pulsante.")
+    st.subheader("Brighton through the seasons")
+    st.caption("Compare up to three seasons with the selected season. Historical data is requested only when you press the button.")
     with st.form("compare_seasons"):
-        requested = st.multiselect("Stagioni da confrontare", [s for s in seasons if s != season], format_func=season_label, max_selections=3)
-        submitted = st.form_submit_button("Confronta le stagioni")
+        requested = st.multiselect("Seasons to compare", [s for s in seasons if s != season], format_func=season_label, max_selections=3)
+        submitted = st.form_submit_button("Compare seasons")
     if submitted:
         st.session_state["comparison"] = (season, requested)
     active_season, chosen = st.session_state.get("comparison", (season, []))
@@ -248,7 +251,7 @@ with compare:
         chosen = []
     comparisons = {season_label(season): rows}
     for other in chosen:
-        with st.spinner(f"Caricamento stagione {season_label(other)}…"):
+        with st.spinner(f"Loading season {season_label(other)}…"):
             historic = source.matches(other)
         show_issue(historic, season_label(other))
         if historic.data:
@@ -257,21 +260,24 @@ with compare:
                 if any(r["played"] for r in other_rows):
                     comparisons[season_label(other)] = other_rows
                 else:
-                    st.info(f"{season_label(other)}: nessun risultato Brighton disponibile.")
+                    st.info(f"{season_label(other)}: no Brighton results available.")
             except (ValueError, KeyError, TypeError):
-                st.warning(f"{season_label(other)}: risultati incoerenti; stagione esclusa dal confronto.")
+                st.warning(f"{season_label(other)}: inconsistent results; season excluded from comparison.")
     if chosen and len(comparisons) > 1:
         st.plotly_chart(points_chart(comparisons), width="stretch", key="comparison")
         comparison_rows = []
         for label, season_rows in comparisons.items():
             s = summary(season_rows)
-            comparison_rows.append({"Stagione": label, "Giocate": s["played"], "Punti": s["points"],
-                                    "Punti / gara": round(s["ppg"], 2) if s["ppg"] is not None else None,
-                                    "GF": s["gf"], "GS": s["ga"]})
+            comparison_rows.append({"Season": label, "Played": s["played"], "Points": s["points"],
+                                    "Points / match": round(s["ppg"], 2) if s["ppg"] is not None else None,
+                                    "GF": s["gf"], "GA": s["ga"]})
         st.dataframe(pd.DataFrame(comparison_rows), hide_index=True, width="stretch")
-        st.caption("La stagione in corso è parziale: confronta le curve a parità di gare giocate e usa la media punti.")
+        st.caption("The current season is incomplete: compare curves at the same number of matches played and use average points.")
     elif not chosen:
-        st.info("Seleziona almeno una stagione per iniziare il confronto.")
+        st.info("Select at least one season to start comparing.")
+
+with squad_tab:
+    render_squad(source)
 
 st.divider()
-st.caption("Football Intelligence Platform · Dati forniti da football-data.org · Analisi descrittiva, nessuna previsione generata.")
+st.caption("Football Intelligence Platform · Data provided by football-data.org · Descriptive analysis; no predictions generated.")

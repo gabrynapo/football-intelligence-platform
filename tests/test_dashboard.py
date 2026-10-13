@@ -34,7 +34,7 @@ SAMPLE = payload([
 class AnalyticsTests(unittest.TestCase):
     def test_away_scores_and_chronological_cumulative_points(self):
         rows = match_rows(SAMPLE, now=datetime(2026, 10, 1, tzinfo=timezone.utc))
-        self.assertEqual([r["result"] for r in rows], ["V", "P", "S", None])
+        self.assertEqual([r["result"] for r in rows], ["W", "D", "L", None])
         self.assertEqual([r["cumulative_points"] for r in rows if r["played"]], [3, 4, 4])
         stats = summary(rows)
         self.assertEqual((stats["points"], stats["gf"], stats["ga"], stats["clean_sheets"]), (4, 3, 4, 1))
@@ -89,7 +89,7 @@ class CacheTests(unittest.TestCase):
         self.responses = [(403, {}, {"message": "secret provider details"})]
         result = self.source().matches(2025)
         self.assertIsNone(result.data)
-        self.assertIn("Accesso negato", result.error)
+        self.assertIn("Access denied", result.error)
         self.source().matches(2025)
         self.assertEqual(self.calls, 1)
 
@@ -131,6 +131,20 @@ class CacheTests(unittest.TestCase):
         self.assertEqual(result.error_code, "connection_error")
         self.assertNotIn("private error text", result.error)
         self.assertIsNone(result.http_status)
+
+    def test_legacy_cached_error_uses_english_without_new_request(self):
+        source = self.source()
+        for code in ("access_denied", None):
+            source._write(source.cache / "standings-2025.json", {
+                "data": None, "checked_at": self.now, "expires_at": self.now + 3600,
+                "error": "Accesso negato per questa stagione.", "error_code": code,
+                "http_status": 403,
+            })
+            result = source.standings(2025)
+            expected = "Access denied" if code else "The previous request failed"
+            self.assertTrue(result.error.startswith(expected))
+            self.assertEqual(result.http_status, 403)
+        self.assertEqual(self.calls, 0)
 
     def test_empty_standings_is_not_access_denied(self):
         self.responses = [(200, {}, {"competition": {"code": "PL"}, "filters": {"season": "2025"}, "standings": []})]

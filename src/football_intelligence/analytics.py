@@ -24,22 +24,22 @@ def match_rows(payload, team_id=BRIGHTON_ID, now=None):
             continue
         match_id = match.get("id")
         if match_id is None or match_id in seen:
-            raise ValueError("Identificativo partita mancante o duplicato.")
+            raise ValueError("Missing or duplicate match ID.")
         seen.add(match_id)
         home_game = home.get("id") == team_id
         date = datetime.fromisoformat(match["utcDate"].replace("Z", "+00:00")) if match.get("utcDate") else None
         if date and date.tzinfo is None:
-            raise ValueError("Data partita senza fuso orario.")
+            raise ValueError("Match date has no timezone.")
         score = (match.get("score") or {}).get("fullTime") or {}
         goals_for, goals_against = (score.get("home"), score.get("away")) if home_game else (score.get("away"), score.get("home"))
         played = (match.get("status") == "FINISHED" and date is not None and date <= now
                   and all(type(g) is int and g >= 0 for g in (goals_for, goals_against)))
-        result = ("V" if goals_for > goals_against else "P" if goals_for == goals_against else "S") if played else None
+        result = ("W" if goals_for > goals_against else "D" if goals_for == goals_against else "L") if played else None
         rows.append({"id": match_id, "date": date, "matchday": match.get("matchday"),
-                     "opponent": (away if home_game else home).get("shortName") or (away if home_game else home).get("name", "Da definire"),
-                     "venue": "Casa" if home_game else "Trasferta", "status": match.get("status"),
+                     "opponent": (away if home_game else home).get("shortName") or (away if home_game else home).get("name", "To be confirmed"),
+                     "venue": "Home" if home_game else "Away", "status": match.get("status"),
                      "gf": goals_for if played else None, "ga": goals_against if played else None,
-                     "played": played, "result": result, "points": {"V": 3, "P": 1, "S": 0}.get(result)})
+                     "played": played, "result": result, "points": {"W": 3, "D": 1, "L": 0}.get(result)})
     rows.sort(key=lambda row: (row["date"] or datetime.max.replace(tzinfo=timezone.utc), row["id"]))
     cumulative = gf = ga = games = 0
     recent = []
@@ -60,9 +60,9 @@ def summary(rows):
     total = len(played)
     points = sum(row["points"] for row in played)
     return {"played": total, "points": points, "ppg": points / total if total else None,
-            "wins": sum(row["result"] == "V" for row in played),
-            "draws": sum(row["result"] == "P" for row in played),
-            "losses": sum(row["result"] == "S" for row in played),
+            "wins": sum(row["result"] == "W" for row in played),
+            "draws": sum(row["result"] == "D" for row in played),
+            "losses": sum(row["result"] == "L" for row in played),
             "gf": sum(row["gf"] for row in played), "ga": sum(row["ga"] for row in played),
             "clean_sheets": sum(row["ga"] == 0 for row in played)}
 

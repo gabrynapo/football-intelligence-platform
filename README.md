@@ -1,16 +1,18 @@
 # Football Intelligence Platform
 
-Portfolio end-to-end di Data Engineering, Football Analytics e Machine Learning:
-Premier League **2026/27**, dashboard inizialmente focalizzata sul **Brighton**.
+An end-to-end portfolio project in Data Engineering, Football Analytics and Machine Learning:
+Premier League **2026/27**, with a dashboard initially focused on **Brighton**.
 
-**Fase attuale: dashboard Streamlit con dati reali.** Sono implementati i probe API,
-il frontend Brighton, un client con cache persistente e test offline/di interfaccia.
-PostgreSQL, pipeline schedulata, dbt e modelli predittivi restano fasi successive.
+**Current stage: a Streamlit dashboard using real data.** Implemented components include
+API discovery probes, the Brighton frontend, a client with persistent caching,
+and offline and UI tests. The entire web interface is in English, including charts,
+error messages and CSV exports. PostgreSQL, a scheduled pipeline, dbt and predictive
+models are planned for later stages.
 
-## Avvia la dashboard
+## Run the dashboard
 
-Il token football-data.org deve essere in `FOOTBALL_DATA_TOKEN` nell'ambiente
-oppure nel file locale `.env`, ignorato da Git. Dal repository, in PowerShell:
+Set the football-data.org token in the `FOOTBALL_DATA_TOKEN` environment variable
+or in the local `.env` file, which is ignored by Git. From the repository in PowerShell:
 
 ```powershell
 python -m venv .venv
@@ -18,49 +20,57 @@ python -m venv .venv
 .venv\Scripts\python.exe -m streamlit run app\streamlit_app.py
 ```
 
-Aprire **http://127.0.0.1:8501**. Se l'ambiente virtuale è già pronto, basta l'ultimo
-comando. Su Linux/macOS usare `.venv/bin/python` al posto di `.venv\Scripts\python.exe`.
+Open **http://127.0.0.1:8501**. If the virtual environment is already set up, only
+the last command is needed. On Linux/macOS, use `.venv/bin/python` instead of
+`.venv\Scripts\python.exe`.
 
-- Selezione stagione e indicatori: punti, posizione, media punti, gol fatti/subiti.
-- Grafici interattivi: punti cumulati, gol per gara, forma sulle ultime 5 partite.
-- Rendimento casa/trasferta, ultimo risultato e prossima partita.
-- Calendario filtrabile con esportazione CSV, classifica con Brighton evidenziato.
-- Confronto fino a quattro stagioni a parità di partite giocate.
+- Season selection and metrics: points, position, average points, goals for/against.
+- Interactive charts: cumulative points, goals per match and form over the last 5 matches.
+- Home/away performance, latest result and next match.
+- Filterable fixtures with CSV export and standings with Brighton highlighted.
+- Comparison of up to four seasons at the same number of matches played.
+- Brighton's current squad from football-data.org: role/nationality filters,
+  player profiles, ages, squad composition charts and CSV export.
 
-La cache locale dura un'ora per risultati/classifiche e 24 ore per il catalogo;
-filtrare tabelle e cambiare scheda non causa nuove chiamate entro questi intervalli.
-Il pulsante di aggiornamento ha un intervallo minimo di 60 secondi. Le richieste
-sono distanziate di almeno 6,1 secondi e condividono il ledger con il probe.
-Nessuna schedulazione o chiamata a pagamento viene attivata.
-[Funzionamento e limiti della dashboard](docs/dashboard.md).
+The squad is the current roster returned by `/teams/397`, regardless of the selected
+season: it does not represent historical squads. It does not include individual
+statistics such as minutes, goals or assists. Verified on 13 October 2026:
+HTTP 200, 30 players.
 
-Il piano API-Football Free dichiara 100 richieste/giorno ma limita le stagioni.
-**Verifica autenticata del 13 ottobre 2026: accesso al 2026/27 negato dal piano
-Free.** La chiave funziona e l'account è attivo; `/leagues?id=39&season=2026`
-restituisce una restrizione di piano e suggerisce le stagioni dal 2022 al 2024.
-Queste annate non sono state ancora provate. **football-data.org è stato invece
-verificato con successo per il 2026/27** ed è la fonte scelta per il prossimo MVP.
-`season=2026` identifica la stagione 2026/27. Non basta che esista nel catalogo,
-né che `coverage` sia positivo: servono risposte reali per gli endpoint necessari.
-Fonti e limiti: [verifica API](docs/api-discovery.md).
+The local cache lasts one hour for results/standings and 24 hours for the catalogue
+and squad. Filtering tables and switching tabs do not trigger new calls for cached
+resources within these intervals. Manual refresh has a minimum interval of 60 seconds.
+Requests are spaced at least 6.1 seconds apart and share the request ledger with
+the probe. No scheduled jobs or paid calls are enabled.
+[Dashboard behaviour and limitations](docs/dashboard.md).
 
-## Alternativa: football-data.org
+The API-Football Free plan advertises 100 requests/day but restricts season access.
+**Authenticated check on 13 October 2026: access to 2026/27 was denied on the Free
+plan.** The key works and the account is active; `/leagues?id=39&season=2026`
+returns a plan restriction and suggests seasons from 2022 to 2024.
+Those seasons have not yet been tested. **football-data.org was successfully
+verified for 2026/27** and is the source used by the dashboard.
+`season=2026` identifies the 2026/27 season. A catalogue entry or a positive
+`coverage` flag is not enough: the required endpoints must return actual data.
+Sources and limitations: [API discovery](docs/api-discovery.md).
 
-Verifica autenticata del **13 ottobre 2026**: 4 risposte HTTP 200, 20 squadre,
-380 partite (60 concluse con punteggio), 38 gare Brighton e classifica TOTAL con
-20 righe. ID Brighton su questo provider: **397**. Verificati successivamente anche
-i risultati 2025/26 e 2024/25 per il confronto in dashboard. Le statistiche avanzate
-restano da verificare; il database resta da implementare.
+## Alternative provider: football-data.org
 
-È disponibile un secondo probe indipendente, con al massimo **4 chiamate**:
-competizione Premier League, squadre, partite e classifica. Controlla il filtro
-stagione e restituisce conteggi, presenza Brighton e prossima partita osservata.
-L'accesso reale viene registrato nel report, senza dedurlo dalla sola lista stagioni.
+Authenticated check on **13 October 2026**: 4 HTTP 200 responses, 20 teams,
+380 matches (60 finished with scores), 38 Brighton fixtures and TOTAL standings
+with 20 rows. Brighton's ID on this provider is **397**. Results for 2025/26 and
+2024/25 were subsequently verified for dashboard comparisons. Advanced statistics
+still need verification; the database has yet to be implemented.
 
-Inserire il token del nuovo provider in `.env` (escluso da Git), su una riga separata:
+A second, independent probe makes at most **4 calls**: Premier League competition
+metadata, teams, matches and standings. It validates the season filter and reports
+counts, Brighton's presence and the next observed fixture. Actual access is recorded
+in the report rather than inferred from the season list alone.
+
+Add the provider token to `.env` (ignored by Git) on a separate line:
 
 ```dotenv
-FOOTBALL_DATA_TOKEN=il_token_del_nuovo_provider
+FOOTBALL_DATA_TOKEN=your_football_data_token
 ```
 
 ```powershell
@@ -68,25 +78,25 @@ python scripts/check_football_data.py --dry-run
 python scripts/check_football_data.py --season 2026 --env-file .env
 ```
 
-`--env-file` legge solo `FOOTBALL_DATA_TOKEN`; una variabile d'ambiente già
-impostata ha precedenza. Non usa mai `API_FOOTBALL_KEY` per il nuovo servizio.
-Report JSON in `reports/football-data-2026-<timestamp>.json`; dettagli e limiti
-in [football-data.org discovery](docs/football-data-discovery.md).
+`--env-file` reads only `FOOTBALL_DATA_TOKEN`; an existing environment variable
+takes precedence. It never uses `API_FOOTBALL_KEY` for this provider.
+JSON reports are saved to `reports/football-data-2026-<timestamp>.json`; see
+[football-data.org discovery](docs/football-data-discovery.md) for details and limitations.
 
-## Avvio senza dipendenze esterne
+## Run the probes without external dependencies
 
-Python 3.11 o superiore; comandi dalla radice del repository:
+Requires Python 3.11 or later. Run these commands from the repository root:
 
 ```powershell
 python scripts/check_api_coverage.py --dry-run
 python -m unittest discover -s tests -v
 ```
 
-Per la verifica reale serve una chiave di un account **diretto API-SPORTS Free**,
-ottenuta dal [dashboard del provider](https://dashboard.api-football.com/).
-Il client non supporta RapidAPI. Impostare `API_FOOTBALL_KEY` nell'ambiente
-del processo; non inserire il token nel codice, in chat o negli argomenti CLI.
-Esempio PowerShell senza registrarlo nella cronologia:
+Live verification requires a key from a **direct API-SPORTS Free account**,
+available from the [provider dashboard](https://dashboard.api-football.com/).
+The client does not support RapidAPI. Set `API_FOOTBALL_KEY` in the process
+environment; do not put the token in source code, chat or CLI arguments.
+PowerShell example that keeps the token out of command history:
 
 ```powershell
 $apiKeyInput = Read-Host 'API-Football key' -AsSecureString
@@ -96,46 +106,48 @@ Remove-Item Env:\API_FOOTBALL_KEY
 Remove-Variable apiKeyInput
 ```
 
-`.env.example` descrive la variabile; **il probe API-Football non carica `.env`**.
-La variabile deve essere esportata nella stessa sessione che avvia Python.
-Non serve installare PostgreSQL, dbt o Streamlit in questa fase.
+`.env.example` documents the variable; **the API-Football probe does not load `.env`**.
+The variable must be exported in the same session that starts Python.
+PostgreSQL, dbt and Streamlit are not required to run the probes.
 
-Il probe esegue al massimo **7 tentativi**, distanziati di almeno 6,1 secondi,
-incluso `/status` nel budget conservativo. È possibile restringerlo con
-`--max-requests 3`. Scrive report JSON e Markdown con timestamp UTC in `reports/`.
-Non pubblica dati, non avvia schedulazioni e non scarica tutte le pagine.
-Un secondo avvio ripete la verifica e consuma nuova quota; riutilizzare il report.
+The probe makes at most **7 attempts**, spaced at least 6.1 seconds apart,
+with `/status` included in the conservative request budget. Reduce the limit with
+`--max-requests 3`. It writes JSON and Markdown reports with UTC timestamps to
+`reports/`. It does not publish data, schedule jobs or fetch every page.
+Running it again repeats the checks and consumes additional quota; reuse existing reports.
 
-Codici di uscita: `0` verifica conclusa (anche con risposte vuote o controlli
-saltati), `2` configurazione mancante/non valida, `3` interruzione con evidenze
-parziali quando disponibili. **Exit 0 non significa piattaforma fattibile.**
-Leggere `outcome`, `coverage_declared`, contatori e campi non null nel JSON.
+Exit codes: `0` checks completed (including empty responses or skipped checks),
+`2` missing/invalid configuration, `3` interrupted with partial evidence where
+available. **Exit 0 does not prove that the platform is feasible.** Inspect
+`outcome`, `coverage_declared`, counts and non-null fields in the JSON report.
 
-## Struttura implementata
+## Implemented structure
 
 ```text
-.github/workflows/ci.yml         # soli test offline, nessun secret/API
+.github/workflows/ci.yml         # offline checks only; no secrets or API calls
 docs/
-  architecture.md               # flusso dati, schema logico, ML e roadmap
-  api-discovery.md              # endpoint, interpretazione e decisione go/no-go
-scripts/check_api_coverage.py    # entrypoint dal checkout
-scripts/check_football_data.py   # probe alternativo football-data.org
+  architecture.md               # data flow, logical schema, ML and roadmap
+  api-discovery.md              # endpoints, interpretation and go/no-go decision
+scripts/check_api_coverage.py    # entry point from the checkout
+scripts/check_football_data.py   # alternative football-data.org probe
 src/football_intelligence/
-  api.py                        # HTTP, quota, classificazione errori
-  probe.py                      # verifica dipendenze e report
-  football_data.py              # client e probe football-data.org v4
-tests/test_probe.py              # risposte sintetiche; zero richieste reali
-reports/                        # report locali ignorati da Git
-.state/                         # ledger e lock locali, creati all'esecuzione
+  api.py                        # HTTP, quota and error classification
+  probe.py                      # dependency checks and reports
+  football_data.py              # football-data.org v4 client and probe
+tests/test_probe.py              # synthetic responses; no live requests
+reports/                        # local reports ignored by Git
+.state/                         # local ledger and lock, created at runtime
 .env.example
 pyproject.toml
 ```
 
-Il frontend è in `app/streamlit_app.py` e i grafici in `app/charts.py`.
-`src/football_intelligence/dashboard_data.py` gestisce cache e accesso ai dati;
-`analytics.py` contiene i calcoli testabili indipendentemente da Streamlit.
-La struttura dei moduli futuri e le milestone sono in [architettura](docs/architecture.md).
+The frontend is in `app/streamlit_app.py`, with charts in `app/charts.py`.
+The squad view is in `app/squad_view.py`; `src/football_intelligence/squad.py`
+validates players, calculates ages and groups positions into roles.
+`src/football_intelligence/dashboard_data.py` handles caching and data access;
+`analytics.py` contains calculations that can be tested independently of Streamlit.
+Future modules and milestones are described in the [architecture](docs/architecture.md).
 
-La cartella iniziale non era un repository Git: per pubblicarla, inizializzare
-Git e collegare un repository GitHub scelto dall'autore. Nessun remote o push
-è stato creato automaticamente. I workflow saranno attivi dopo la pubblicazione.
+The original folder was not a Git repository. To publish it, initialise Git and
+connect a GitHub repository of your choice. No remote or push was created
+automatically. Workflows will run after the repository is published to GitHub.
