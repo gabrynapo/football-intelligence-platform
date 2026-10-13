@@ -40,8 +40,12 @@ h1,h2,h3 {letter-spacing:-.035em;}
 .match-card .label {font-size:10px;text-transform:uppercase;letter-spacing:1.4px;color:#6c7e97;font-weight:700;margin-bottom:12px;}
 .match-card .value {font-size:19px;font-weight:750;color:#142f50;line-height:1.35;}
 .match-card .sub {font-size:12px;color:#6c7e97;margin-top:8px;}
-.form {display:inline-block;padding:6px 10px;border-radius:7px;margin:0 5px 3px 0;font-size:13px;font-weight:800;}
-.form-W {background:#dff4ec;color:#197355}.form-D {background:#fff1d6;color:#986c1d}.form-L {background:#fde6e4;color:#b14641}
+.form-card {background:white;border:1px solid #e6ecf5;border-radius:14px;padding:18px 20px;min-height:92px;box-sizing:border-box;}
+.form-card .label {font-size:14px;color:#6c7e97;font-weight:600;margin-bottom:10px;}
+.form-sequence {display:flex;gap:8px;align-items:center;min-height:34px;}
+.form-badge {display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:9px;font-size:14px;font-weight:800;}
+.form-badge-W {background:#dff4ec;color:#197355}.form-badge-D {background:#fff1d6;color:#986c1d}.form-badge-L {background:#fde6e4;color:#b14641}
+.form-card .sub {font-size:12px;color:#6c7e97;margin-top:8px;}
 div[data-testid="stTabs"] {margin-top:24px;}
 button[data-baseweb="tab"] {font-size:15px;}
 @media(max-width:700px){.hero{padding:24px}.hero h1{font-size:29px}.block-container{padding-top:1rem}}

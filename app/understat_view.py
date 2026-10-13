@@ -23,6 +23,24 @@ def paired_chart(categories, actual, expected, names=("Actual", "Expected")):
     return finish(fig)
 
 
+def last_five_card(matches):
+    """Return the form card markup, ordered from the oldest result to the latest."""
+    labels = {"W": "Win", "D": "Draw", "L": "Loss"}
+    badges = "".join(
+        f'<span class="form-badge form-badge-{escape(match["result"])}" '
+        f'title="{labels.get(match["result"], "Result")}" '
+        f'aria-label="{labels.get(match["result"], "Result")}">{escape(match["result"])}</span>'
+        for match in matches[-5:]
+    )
+    return (
+        '<div class="form-card">'
+        '<div class="label">Last 5</div>'
+        f'<div class="form-sequence">{badges}</div>'
+        '<div class="sub">Oldest to latest</div>'
+        '</div>'
+    )
+
+
 def render_comparison(source):
     result = source.comparison()
     if result.error:
@@ -110,7 +128,7 @@ def render_dashboard(source, season, dataset):
             upcoming = [r for r in rows if not r["played"] and r["status"] == "SCHEDULED"]
             a, b, c = st.columns(3)
             a.metric("Latest result", f"{last['gf']}–{last['ga']}", help=last["opponent"])
-            b.metric("Last 5", " ".join(r["result"] for r in completed[-5:]))
+            b.markdown(last_five_card(completed), unsafe_allow_html=True)
             c.metric("Next opponent", upcoming[0]["opponent"] if upcoming else "—")
             left, right = st.columns(2)
             left.plotly_chart(points_chart({season_label(season): rows}), width="stretch", key="points")

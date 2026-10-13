@@ -14,6 +14,7 @@ sys.path.insert(0, str(ROOT / "app"))
 
 from football_intelligence.understat_data import UnderstatSource
 from football_intelligence.understat_live import normalize_live
+from understat_view import last_five_card
 from understat_fixtures import NOW, live_payload, write_season
 from metric_labels import PLAYER_LABELS, TEAM_LABELS
 
@@ -100,6 +101,18 @@ class DashboardUITests(unittest.TestCase):
         self.assertFalse(app.exception)
         remote.assert_called_once_with("http://127.0.0.1:8000")
         self.assertEqual(app.metric[0].value, "3")
+
+    def test_last_five_card_uses_a_coloured_badge_for_each_result(self):
+        markup = last_five_card([
+            {"result": "W"}, {"result": "D"}, {"result": "L"},
+            {"result": "W"}, {"result": "D"},
+        ])
+        self.assertIn('form-badge form-badge-W', markup)
+        self.assertIn('form-badge form-badge-D', markup)
+        self.assertIn('form-badge form-badge-L', markup)
+        self.assertIn('title="Win"', markup)
+        self.assertIn('title="Draw"', markup)
+        self.assertIn('title="Loss"', markup)
 
 
 if __name__ == "__main__":

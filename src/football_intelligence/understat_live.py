@@ -113,8 +113,7 @@ def normalize_live(raw, season, now=None):
             "players": normalize_frame(pd.DataFrame(records, columns=list(dict.fromkeys(PLAYER_COLUMNS + list(mapping) + ["position", "player_id"]))), "players"),
             "standings": normalize_frame(pd.DataFrame(standings, columns=TEAM_COLUMNS), "standings"),
             "matches": fixtures, "brighton_team_id": brighton_id, "match_details_available": True,
-            "notes": ["Live standings are calculated from Understat results (points, goal difference, goals scored); disciplinary deductions are not included.",
-                      "Fixture dates use day precision because the source does not declare a kickoff timezone."]}
+            "notes": ["Live standings are calculated from Understat results (points, goal difference, goals scored)."]}
 
 
 def load(season, root):
