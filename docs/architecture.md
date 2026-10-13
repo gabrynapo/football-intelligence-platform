@@ -14,18 +14,19 @@ su richiesta, oppure consuma gli endpoint FastAPI con la stessa cache condivisa.
 PostgreSQL, dbt, orchestrazione e modelli sotto sono decisioni progettuali per
 le milestone successive. [Dashboard implementata](dashboard.md).
 
-Aggiornamento fonte, **13 ottobre 2026**: il probe API-Football ha rilevato il
-diniego Free sul 2026/27. Il successivo probe football-data.org ha verificato
-squadre, calendario, risultati e classifica per la stessa stagione; questo è
-ora il provider dell'MVP. [Evidenze e limiti](football-data-discovery.md).
-Le statistiche dettagliate per partita rimangono estensioni future: non sono
-state verificate nel piano football-data.org e non bloccano il primo rilascio.
+Aggiornamento fonte, **13 ottobre 2026**: la dashboard usa i CSV Understat locali
+per le stagioni concluse e `soccerdata`/Understat per quella corrente. I CSV
+forniscono tutte le squadre per le classifiche e solo le tuple giocatore che
+contengono Brighton per le viste giocatori. La risposta live contiene calendario,
+cronologia squadra e statistiche giocatori. [Dettagli](player-data.md).
+I CSV storici sono aggregati finali: le statistiche per partita e gli snapshot
+point-in-time restano un'estensione futura.
 
 ## Flusso previsto
 
 ```mermaid
 flowchart LR
-    A[football-data.org] --> B[Python: budget e acquisizione]
+    A[CSV Understat + soccerdata] --> B[Python: validazione e cache]
     B --> C[(PostgreSQL: raw e audit)]
     C --> D[dbt: staging e marts]
     D --> E[Feature al cutoff temporale]
@@ -41,9 +42,9 @@ flowchart LR
 ```
 
 Nell'architettura finale Streamlit leggerà il database con utente read-only e
-cache. Nell'MVP attuale l'adapter legge l'API soltanto alla scadenza della cache
-o al refresh esplicito, rispettando quota e cooldown. UI: filtro stagione, risultati e prossima gara, punti
-cumulati, gol fatti/subiti, forma recente e split casa/trasferta. Grafici di
+cache. Nell'MVP attuale l'adapter legge soltanto i CSV per lo storico e Understat
+per la stagione corrente alla scadenza della cache o al refresh esplicito. UI:
+filtro stagione, xG/xGA/xA, punti cumulati e forma nella stagione live. Grafici di
 trend e distribuzioni predittive indicano campione, cutoff e ultimo aggiornamento.
 Valori mancanti rimangono tali: niente conversioni implicite in zero.
 
@@ -116,14 +117,12 @@ esplicita le dipendenze e produce documentazione del lineage.
 
 ## Quota, aggiornamenti e qualità
 
-Pianificare un unico batch giornaliero, senza livescore. Per football-data.org,
-rispettare 10 chiamate/minuto; mantenere un limite locale prudenziale di 80
-tentativi/giorno, che non è un limite contrattuale del nuovo provider.
-Prima stima: calendario e classifica = circa 2 chiamate/giorno, con squadre e
-metadati settimanali. Le metriche Brighton di base si derivano dai risultati.
-Non è una promessa sui costi: pagine, retry, backfill e chiamate fallite entrano
-nel ledger prima della richiesta. Le statistiche avanzate richiedono una fonte
-separatamente verificata e un nuovo piano di consumo.
+Pianificare un unico batch giornaliero, senza livescore. L'adapter Understat usa
+un solo payload stagionale per squadra, giocatori e calendario; ha timeout,
+intervallo minimo locale, lock e nessun retry automatico. Non trattare il dato
+pubblico come un SLA: cache, freschezza e fallimenti devono restare visibili.
+Le metriche avanzate sono disponibili per analisi descrittiva, ma richiedono
+snapshot storici per un uso ML rigoroso.
 
 Cache dei metadati, risultati recenti ricontrollati per correzioni, backfill a
 piccoli blocchi con checkpoint e priorità inferiore al refresh corrente.
