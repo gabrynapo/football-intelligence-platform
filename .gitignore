@@ -1,0 +1,16 @@
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.env
+.env.*
+!.env.example
+.state/
+reports/*
+!reports/.gitkeep
+data/
+dbt/target/
+dbt/logs/
+.coverage
+.pytest_cache/
+
