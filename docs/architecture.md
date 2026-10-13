@@ -8,14 +8,23 @@ il dataset di base contiene **tutta la Premier League**. Un modello di forza
 squadra e una simulazione della classifica richiedono anche avversarie e calendario
 completo. La raccolta delle statistiche dettagliate può inizialmente limitarsi al Brighton.
 
-Ora sono implementati solo il probe e i test. Ogni componente sotto, salvo
-il probe, è una decisione progettuale da validare nelle milestone successive.
+Sono implementati i probe, la dashboard Streamlit e i relativi test. Il frontend
+usa per ora un adapter con cache JSON locale e caricamento su richiesta.
+PostgreSQL, dbt, orchestrazione e modelli sotto sono decisioni progettuali per
+le milestone successive. [Dashboard implementata](dashboard.md).
+
+Aggiornamento fonte, **13 ottobre 2026**: il probe API-Football ha rilevato il
+diniego Free sul 2026/27. Il successivo probe football-data.org ha verificato
+squadre, calendario, risultati e classifica per la stessa stagione; questo è
+ora il provider dell'MVP. [Evidenze e limiti](football-data-discovery.md).
+Le statistiche dettagliate per partita rimangono estensioni future: non sono
+state verificate nel piano football-data.org e non bloccano il primo rilascio.
 
 ## Flusso previsto
 
 ```mermaid
 flowchart LR
-    A[API-Football] --> B[Python: budget e acquisizione]
+    A[football-data.org] --> B[Python: budget e acquisizione]
     B --> C[(PostgreSQL: raw e audit)]
     C --> D[dbt: staging e marts]
     D --> E[Feature al cutoff temporale]
@@ -30,8 +39,9 @@ flowchart LR
     J --> F
 ```
 
-Streamlit legge il database con utente read-only e cache, senza interrogare
-l'API ad ogni visita. UI: filtro stagione, risultati e prossima gara, punti
+Nell'architettura finale Streamlit leggerà il database con utente read-only e
+cache. Nell'MVP attuale l'adapter legge l'API soltanto alla scadenza della cache
+o al refresh esplicito, rispettando quota e cooldown. UI: filtro stagione, risultati e prossima gara, punti
 cumulati, gol fatti/subiti, forma recente e split casa/trasferta. Grafici di
 trend e distribuzioni predittive indicano campione, cutoff e ultimo aggiornamento.
 Valori mancanti rimangono tali: niente conversioni implicite in zero.
@@ -105,12 +115,14 @@ esplicita le dipendenze e produce documentazione del lineage.
 
 ## Quota, aggiornamenti e qualità
 
-Pianificare un unico batch giornaliero, senza livescore. Budget operativo futuro
-massimo 80 tentativi/giorno, margine rispetto ai 100 contrattuali e controllo quota
-reale. Ipotesi da misurare dopo discovery: status + calendario + classifica +
-statistiche Brighton = circa 4 chiamate/giorno, più 1 per ciascuna partita Brighton
-da arricchire; metadati settimanali. Non è una promessa sui costi: pagine, retry,
-backfill e chiamate fallite entrano nel ledger prima della richiesta.
+Pianificare un unico batch giornaliero, senza livescore. Per football-data.org,
+rispettare 10 chiamate/minuto; mantenere un limite locale prudenziale di 80
+tentativi/giorno, che non è un limite contrattuale del nuovo provider.
+Prima stima: calendario e classifica = circa 2 chiamate/giorno, con squadre e
+metadati settimanali. Le metriche Brighton di base si derivano dai risultati.
+Non è una promessa sui costi: pagine, retry, backfill e chiamate fallite entrano
+nel ledger prima della richiesta. Le statistiche avanzate richiedono una fonte
+separatamente verificata e un nuovo piano di consumo.
 
 Cache dei metadati, risultati recenti ricontrollati per correzioni, backfill a
 piccoli blocchi con checkpoint e priorità inferiore al refresh corrente.
