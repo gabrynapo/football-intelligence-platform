@@ -1,6 +1,7 @@
 """Streamlit interaction tests, entirely offline."""
 
 import importlib.util
+import os
 from pathlib import Path
 import sys
 import unittest
@@ -105,6 +106,20 @@ class DashboardUITests(unittest.TestCase):
                 self.assertFalse(app.exception)
                 self.assertEqual(app.metric[0].value, "4")
                 self.assertTrue(any("empty squad" in item.value for item in app.info) or any("Squad: Access denied" in item.value for item in app.warning))
+
+    def test_frontend_can_select_fastapi_backend(self):
+        from streamlit.testing.v1 import AppTest
+        from football_intelligence.dashboard_client import ApiDashboardSource
+
+        with patch.dict(os.environ, {"FOOTBALL_API_BASE_URL": "http://127.0.0.1:8000"}), \
+                patch.object(ApiDashboardSource, "catalog", FakeSource.catalog), \
+                patch.object(ApiDashboardSource, "matches", FakeSource.matches), \
+                patch.object(ApiDashboardSource, "standings", FakeSource.standings), \
+                patch.object(ApiDashboardSource, "squad", FakeSource.squad):
+            app = AppTest.from_file(str(ROOT / "app" / "streamlit_app.py"), default_timeout=15).run()
+            self.assertFalse(app.exception)
+            self.assertEqual(app.metric[0].value, "4")
+            self.assertTrue(any(metric.label == "Squad size" for metric in app.metric))
 
 
 if __name__ == "__main__":

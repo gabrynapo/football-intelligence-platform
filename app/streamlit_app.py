@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from base64 import b64encode
 from html import escape
 from pathlib import Path
+import os
 import sys
 from zoneinfo import ZoneInfo
 
@@ -16,6 +17,7 @@ sys.path.insert(0, str(ROOT / "app"))
 from football_intelligence.analytics import BRIGHTON_ID, match_rows, season_label, season_options, summary, total_table
 from football_intelligence.api import StopProbe
 from football_intelligence.dashboard_data import DashboardSource
+from football_intelligence.dashboard_client import ApiDashboardSource
 from football_intelligence.football_data import token_from_environment
 from charts import form_chart, goals_chart, points_chart
 from squad_view import render_squad
@@ -82,12 +84,20 @@ with st.sidebar:
     logo_data = b64encode((ROOT / "resources" / "logo_brighton.png").read_bytes()).decode("ascii")
     st.markdown(f'<div class="brand"><img class="crest" src="data:image/png;base64,{logo_data}" alt="Brighton & Hove Albion logo"> Brighton<small>FOOTBALL INTELLIGENCE</small></div>', unsafe_allow_html=True)
     st.caption("YOUR VIEW OF THE CLUB")
-try:
-    token = token_from_environment(ROOT / ".env" if (ROOT / ".env").exists() else None)
-except (OSError, StopProbe):
-    st.error("Unable to read the local configuration. Check FOOTBALL_DATA_TOKEN in .env.")
-    st.stop()
-source = DashboardSource(token)
+backend_url = os.environ.get("FOOTBALL_API_BASE_URL", "").strip()
+if backend_url:
+    try:
+        source = ApiDashboardSource(backend_url)
+    except ValueError:
+        st.error("FOOTBALL_API_BASE_URL must be a valid HTTP(S) backend URL.")
+        st.stop()
+else:
+    try:
+        token = token_from_environment(ROOT / ".env" if (ROOT / ".env").exists() else None)
+    except (OSError, StopProbe):
+        st.error("Unable to read the local configuration. Check FOOTBALL_DATA_TOKEN in .env.")
+        st.stop()
+    source = DashboardSource(token)
 with st.spinner("Loading seasons…"):
     catalog = source.catalog()
 show_issue(catalog, "Seasons")

@@ -3,9 +3,10 @@
 An end-to-end portfolio project in Data Engineering, Football Analytics and Machine Learning:
 Premier League **2026/27**, with a dashboard initially focused on **Brighton**.
 
-**Current stage: a Streamlit dashboard using real data.** Implemented components include
-API discovery probes, the Brighton frontend, a client with persistent caching,
-and offline and UI tests. The entire web interface is in English, including charts,
+**Current stage: a Streamlit dashboard and a FastAPI backend using real data.**
+Implemented components include API discovery probes, the Brighton frontend,
+a client with persistent caching, a local REST API, and offline and UI tests.
+The entire web interface is in English, including charts,
 error messages and CSV exports. PostgreSQL, a scheduled pipeline, dbt and predictive
 models are planned for later stages.
 
@@ -16,13 +17,52 @@ or in the local `.env` file, which is ignored by Git. From the repository in Pow
 
 ```powershell
 python -m venv .venv
-.venv\Scripts\python.exe -m pip install -e ".[dashboard]"
+.venv\Scripts\python.exe -m pip install -r requirements.txt
 .venv\Scripts\python.exe -m streamlit run app\streamlit_app.py
 ```
 
 Open **http://127.0.0.1:8501**. If the virtual environment is already set up, only
 the last command is needed. On Linux/macOS, use `.venv/bin/python` instead of
 `.venv\Scripts\python.exe`.
+
+## Run with the FastAPI backend
+
+FastAPI exposes the same cached data through HTTP. The dependencies are already
+included in `requirements.txt`:
+
+```powershell
+.venv\Scripts\python.exe -m pip install -r requirements.txt
+```
+
+Start the backend from the repository root in one terminal. It reads
+`FOOTBALL_DATA_TOKEN` from the environment or the local `.env` file:
+
+```powershell
+.venv\Scripts\python.exe -m uvicorn --app-dir src football_intelligence.web_api:app --host 127.0.0.1 --port 8000
+```
+
+In a second terminal, point Streamlit at the backend and start the dashboard:
+
+```powershell
+$env:FOOTBALL_API_BASE_URL = "http://127.0.0.1:8000"
+.venv\Scripts\python.exe -m streamlit run app\streamlit_app.py
+```
+
+Open the dashboard at **http://127.0.0.1:8501** and the interactive API docs at
+**http://127.0.0.1:8000/docs**. `GET /health` checks the API process without using
+provider quota. Other routes are `GET /api/v1/seasons`,
+`GET /api/v1/seasons/{season}/matches`,
+`GET /api/v1/seasons/{season}/standings`, and
+`GET /api/v1/brighton/squad`. Each accepts `?refresh=true`, subject to the
+existing 60-second cooldown. Responses include `data`, `fetched_at`, `error`,
+`stale`, `error_code` and the provider's `http_status`. Missing uncached data
+returns an appropriate HTTP error; a stale saved copy remains available with
+`stale: true`.
+
+The backend and direct Streamlit mode use the same local cache and request ledger.
+FastAPI does not shorten football-data.org's response time or bypass its Free
+plan limit of 10 requests per minute. Keep the backend bound to `127.0.0.1`:
+these local read endpoints do not implement public-user authentication.
 
 - Season selection and metrics: points, position, average points, goals for/against.
 - Interactive charts: cumulative points, goals per match and form over the last 5 matches.
@@ -134,11 +174,13 @@ src/football_intelligence/
   api.py                        # HTTP, quota and error classification
   probe.py                      # dependency checks and reports
   football_data.py              # football-data.org v4 client and probe
+  dashboard_client.py           # optional Streamlit client for the local API
+  web_api.py                    # FastAPI routes over the shared cache
 tests/test_probe.py              # synthetic responses; no live requests
 reports/                        # local reports ignored by Git
 .state/                         # local ledger and lock, created at runtime
 .env.example
-pyproject.toml
+requirements.txt
 ```
 
 The frontend is in `app/streamlit_app.py`, with charts in `app/charts.py`.
@@ -148,6 +190,5 @@ validates players, calculates ages and groups positions into roles.
 `analytics.py` contains calculations that can be tested independently of Streamlit.
 Future modules and milestones are described in the [architecture](docs/architecture.md).
 
-The original folder was not a Git repository. To publish it, initialise Git and
-connect a GitHub repository of your choice. No remote or push was created
-automatically. Workflows will run after the repository is published to GitHub.
+GitHub Actions runs the offline checks on pushes and pull requests after the
+repository is published to GitHub.

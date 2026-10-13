@@ -8,8 +8,9 @@ il dataset di base contiene **tutta la Premier League**. Un modello di forza
 squadra e una simulazione della classifica richiedono anche avversarie e calendario
 completo. La raccolta delle statistiche dettagliate può inizialmente limitarsi al Brighton.
 
-Sono implementati i probe, la dashboard Streamlit e i relativi test. Il frontend
-usa per ora un adapter con cache JSON locale e caricamento su richiesta.
+Sono implementati i probe, la dashboard Streamlit, un backend FastAPI opzionale
+e i relativi test. Il frontend usa un adapter con cache JSON locale e caricamento
+su richiesta, oppure consuma gli endpoint FastAPI con la stessa cache condivisa.
 PostgreSQL, dbt, orchestrazione e modelli sotto sono decisioni progettuali per
 le milestone successive. [Dashboard implementata](dashboard.md).
 

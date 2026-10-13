@@ -4,6 +4,13 @@ Frontend Streamlit interamente in inglese, alimentato da football-data.org. Ness
 dimostrativo viene inserito nell'interfaccia: le fixture sintetiche esistono solo
 nei test. L'app ascolta su `127.0.0.1:8501`, senza esporre il server alla rete locale.
 
+È disponibile anche un backend FastAPI locale su `127.0.0.1:8000`: con
+`FOOTBALL_API_BASE_URL=http://127.0.0.1:8000` Streamlit usa i suoi endpoint per
+stagioni, partite, classifiche e rosa. Senza questa variabile continua a usare
+direttamente `DashboardSource`. Entrambe le modalità condividono cache, ledger,
+cooldown e limite richieste. FastAPI non riduce l'attesa delle chiamate al provider.
+Il backend non include autenticazione per utenti pubblici; avviarlo solo su loopback.
+
 ## Interfaccia
 
 La barra laterale seleziona una stagione del catalogo dal 2017 in avanti.
