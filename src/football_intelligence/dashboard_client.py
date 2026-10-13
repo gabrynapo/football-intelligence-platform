@@ -49,3 +49,12 @@ class ApiDashboardSource:
 
     def squad(self, refresh=False):
         return self._get("/api/v1/brighton/squad", refresh)
+
+    def players(self, season, refresh=False):
+        return self._get(f"/api/v1/seasons/{int(season)}/brighton/players", refresh)
+
+    def season(self, season, refresh=False):
+        return self._get(f"/api/v1/seasons/{int(season)}/brighton/summary", refresh)
+
+    def comparison(self, refresh=False):
+        return self._get("/api/v1/brighton/comparison", refresh)
