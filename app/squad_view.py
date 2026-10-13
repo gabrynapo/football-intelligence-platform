@@ -1,85 +1,78 @@
-"""Current roster view, independent of the selected competition season."""
-
-from datetime import datetime
-from zoneinfo import ZoneInfo
+﻿"""Understat Brighton player analysis for the selected season."""
 
 import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from football_intelligence.squad import squad_rows
+from football_intelligence.analytics import season_label
+from football_intelligence.understat_data import player_totals
+from charts import finish
+from metric_labels import PLAYER_LABELS
 
 
-def render_squad(source):
-    st.subheader("Brighton's current squad")
-    st.info("Current squad returned by football-data.org: this is not the historical squad for the season selected in the sidebar.")
-    refresh = st.button("Refresh squad", key="refresh_squad")
-    with st.spinner("Loading squad…"):
-        dataset = source.squad(refresh=refresh)
-    if dataset.error:
-        st.warning("Squad: " + dataset.error + (" Showing the last saved copy; it is not up to date." if dataset.stale else ""))
-    if dataset.data is None:
+def render_players(data, season):
+    st.subheader(f"Brighton players · {season_label(season)}")
+    players = data.get("players", [])
+    if not players:
+        st.info("No Brighton player statistics are available for this season.")
         return
-    today = datetime.now(ZoneInfo("Europe/Rome")).date()
-    try:
-        rows = squad_rows(dataset.data, as_of=today)
-    except (ValueError, TypeError, AttributeError):
-        st.error("The squad data is invalid. Unable to display players.")
-        return
-    st.caption(f"Source: football-data.org · Retrieved (UTC): {dataset.fetched_at or 'not available'} · Cache: 24 hours; manual refresh at most once every 60 seconds.")
-    if not rows:
-        st.info("The provider returned an empty squad for Brighton.")
-        return
-    frame = pd.DataFrame([{"ID": r["id"], "Player": r["name"], "Role": r["role"],
-                           "Provider position": r["position"], "Nationality": r["nationality"],
-                           "Date of birth": r["birth_date"], "Age": r["age"]} for r in rows])
-    frame["Age"] = frame["Age"].astype("Int64")
-    ages = [r["age"] for r in rows if r["age"] is not None]
-    countries = {r["nationality"] for r in rows if r["nationality"] != "Not available"}
-    a, b, c = st.columns(3)
-    a.metric("Squad size", len(rows))
-    b.metric("Average age", f"{sum(ages) / len(ages):.1f}" if ages else "—")
-    c.metric("Nationalities", len(countries))
-    st.caption(f"Age as of {today:%d/%m/%Y}, available for {len(ages)}/{len(rows)} players. Missing data is left blank.")
-    left, right = st.columns(2)
-    with left:
-        roles = frame.groupby("Role").size().reset_index(name="Players")
-        chart = px.bar(roles, x="Role", y="Players", title="Squad by role", color_discrete_sequence=["#135b9b"])
-        chart.update_yaxes(dtick=1)
-        st.plotly_chart(chart, width="stretch", key="squad_roles")
-    with right:
-        if ages:
-            chart = px.histogram(x=ages, title="Age distribution", labels={"x": "Age"}, color_discrete_sequence=["#399cc7"])
-            chart.update_traces(xbins=dict(size=1))
-            chart.update_yaxes(title="Players", dtick=1)
-            st.plotly_chart(chart, width="stretch", key="squad_ages")
-        else:
-            st.info("Birth dates are unavailable for the age chart.")
-    st.caption("Charts describe the whole squad; the filters below apply to the table and player profiles.")
-    left, right = st.columns(2)
-    role = left.selectbox("Role", ["All", *sorted(frame["Role"].unique())], key="squad_role")
-    country = right.selectbox("Nationality", ["All", *sorted(frame["Nationality"].unique())], key="squad_country")
-    filtered = frame
-    if role != "All":
-        filtered = filtered[filtered["Role"] == role]
-    if country != "All":
-        filtered = filtered[filtered["Nationality"] == country]
+    frame = pd.DataFrame(players)
+    totals = player_totals(players)
+    metrics = st.columns(4)
+    for col, label, value in zip(metrics, ["Players", "Recorded goals", "Recorded assists", "xA" if totals["xA_complete"] else "xA (partial)"],
+                               [len(players), totals["goals"], totals["assists"], totals["xA"]]):
+        col.metric(label, "—" if value is None else f"{value:.2f}" if label.startswith("xA") else f"{value:g}")
+    if totals["excluded_multi_club"]:
+        st.warning(f"{totals['excluded_multi_club']} player row(s) combine Brighton with another club. Their statistics are retained and labelled, but excluded from club totals and charts. Brighton-only xA is incomplete for this season.")
+    st.caption("Season participants, not the current squad. All supplied CSV fields are available in the table and export. Missing values remain blank.")
+    search_col, minute_col = st.columns(2)
+    search = search_col.text_input("Find a player", key=f"player_search_{season}")
+    minutes = minute_col.number_input("Minimum minutes", min_value=0, max_value=10000, value=0, step=90, key=f"player_minutes_{season}")
+    include_transfers = st.checkbox("Include rows covering multiple clubs", value=True, key=f"player_transfers_{season}")
+    filtered = frame[frame["player"].str.contains(search, case=False, regex=False, na=False)]
+    if minutes:
+        filtered = filtered[filtered["min"].ge(minutes)]
+    if not include_transfers:
+        filtered = filtered[~filtered["multi_club"]]
     if filtered.empty:
         st.info("No players match the filters.")
         return
-    st.dataframe(filtered.drop(columns="ID"), hide_index=True, width="stretch",
-                 column_config={"Age": st.column_config.NumberColumn(format="%d"),
-                                "Date of birth": st.column_config.DateColumn(format="DD/MM/YYYY")})
-    st.download_button("Download filtered squad · CSV", filtered.to_csv(index=False).encode("utf-8-sig"),
-                       file_name=f"brighton-current-squad-{today}.csv", mime="text/csv")
-    players = {r["id"]: r for r in rows}
-    selected = st.selectbox("Player profile", filtered["ID"].tolist(),
-                            format_func=lambda pid: players[pid]["name"], key="squad_player")
-    player = players[selected]
+    chart_frame = filtered[~filtered["multi_club"]]
+    left, right = st.columns(2)
+    for col, field, title, color in ((left, "xG", "Expected goals leaders", "#1475E1"),
+                                     (right, "xA", "Expected assists leaders", "#17A398")):
+        if chart_frame[field].notna().any():
+            leaders = chart_frame.dropna(subset=[field]).nlargest(10, field)
+            fig = px.bar(leaders, x="player", y=field, labels={"player": "Player"}, color_discrete_sequence=[color])
+            col.subheader(title)
+            col.plotly_chart(finish(fig, 320, field), width="stretch", key=f"player_{field}")
+    if not chart_frame.empty:
+        scatter = chart_frame.dropna(subset=["xG", "goals", "min"])
+        if not scatter.empty:
+            st.plotly_chart(finish(px.scatter(scatter, x="xG", y="goals", size="min", hover_name="player",
+                                              labels={"goals": "Goals", "min": "Minutes"},
+                                              color_discrete_sequence=["#135b9b"]), 340, "Goals"),
+                            width="stretch", key="player_finishing")
+    st.caption("Player charts follow the filters and use Brighton-only rows. xG and xA are expected goals and expected assists; per-90 values are rates, not totals.")
+    visible = filtered.rename(columns=PLAYER_LABELS)
+    st.dataframe(visible, hide_index=True, width="stretch",
+                 column_config={label: st.column_config.NumberColumn(format="%.2f") for field, label in PLAYER_LABELS.items()
+                                if field.startswith("x") or field.startswith("NPx")})
+    st.download_button("Download filtered players · CSV", visible.to_csv(index=False).encode("utf-8-sig"),
+                       file_name=f"brighton-{season}-players.csv", mime="text/csv")
+    indices = filtered.index.tolist()
+    selected = st.selectbox("Player profile", indices, format_func=lambda i: frame.loc[i, "player"], key=f"player_profile_{season}")
+    player = frame.loc[selected]
     with st.container(border=True):
-        st.subheader(player["name"])
-        st.text(f"{player['role']} · {player['nationality']}")
-        birthday = player["birth_date"].strftime("%d/%m/%Y") if player["birth_date"] else "Not available"
-        st.text(f"Date of birth: {birthday} · Age: {player['age'] if player['age'] is not None else 'Not available'}")
-        st.caption(f"ID football-data.org: {selected}")
-    st.caption("This endpoint provides squad and player profile data. Individual appearances, minutes, goals and assists are not included in this view.")
+        st.subheader(player["player"])
+        st.caption(f"{player['team']} · {season_label(season)}")
+        if player["multi_club"]:
+            st.warning("This row contains combined statistics for all listed clubs. A Brighton-only split is not available in this file.")
+        fields = [field for field in frame.columns if field not in ("player", "team", "multi_club")]
+        st.dataframe(pd.DataFrame({"Metric": [PLAYER_LABELS.get(f, f) for f in fields],
+                                  "Value": ["—" if pd.isna(player[f]) else f"{player[f]:.2f}" if isinstance(player[f], float)
+                                            else str(player[f]) for f in fields]}), hide_index=True, width="stretch")
+    with st.expander("Metric guide"):
+        st.markdown("**xG / xA:** expected goals and expected assists. **NPxG / NPG:** expected goals and goals excluding penalties. "
+                    "**xGChain:** xG of possessions a player participates in. **xGBuildup:** contribution earlier in those possessions, excluding the final shot and key pass. "
+                    "**/ 90:** rate per 90 minutes. Chain and buildup contributions overlap between teammates and should not be summed as team xG.")
