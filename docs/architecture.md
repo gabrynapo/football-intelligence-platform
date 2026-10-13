@@ -61,7 +61,7 @@ Estendere l'attuale struttura solo quando una milestone richiede il componente:
 
 ```text
 src/football_intelligence/
-  api.py, probe.py        # già presenti; base da evolvere dopo discovery
+  storage.py              # cache JSON, lock locale e envelope delle risposte
   ingestion/             # estrazione, ledger condiviso, snapshot e caricamento
   quality/               # controlli fonte, freschezza e riconciliazione
   features/              # dataset storici point-in-time

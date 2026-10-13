@@ -2,9 +2,6 @@
 
 from datetime import datetime, timezone
 
-BRIGHTON_ID = 397  # Observed football-data.org ID; never an API-SPORTS identifier.
-
-
 def season_label(year):
     return f"{year}/{str(year + 1)[-2:]}"
 
@@ -15,7 +12,7 @@ def season_options(catalog):
                    if s.get("startDate") and 2017 <= int(s["startDate"][:4]) <= current} | {current}, reverse=True)
 
 
-def match_rows(payload, team_id=BRIGHTON_ID, now=None):
+def match_rows(payload, team_id, now=None):
     now = now or datetime.now(timezone.utc)
     rows, seen = [], set()
     for match in payload.get("matches", []):

@@ -142,8 +142,6 @@ tests/                   # Offline data, cache, API and Streamlit tests
 docs/                    # Architecture and data semantics
 ```
 
-API-Football and football-data.org probes and legacy adapters remain as earlier
-experiments. The dashboard and default backend do not use them or their tokens.
 PostgreSQL, dbt, scheduled ingestion, predictive models and Monte Carlo simulations
 remain future milestones. Season-end aggregates must not be used as features for
 earlier matches without point-in-time evidence.

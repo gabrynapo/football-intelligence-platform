@@ -5,7 +5,7 @@ from dataclasses import asdict
 from fastapi import Depends, FastAPI, Path as PathParameter, Response
 from pydantic import BaseModel
 
-from .dashboard_data import Dataset
+from .storage import Dataset
 from .understat_data import UnderstatSource
 
 

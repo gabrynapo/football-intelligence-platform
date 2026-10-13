@@ -5,11 +5,11 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, urlsplit
 from urllib.request import Request, urlopen
 
-from .dashboard_data import Dataset
+from .storage import Dataset
 
 
 class ApiDashboardSource:
-    """Same read methods as DashboardSource, with the provider token kept server-side."""
+    """Read the local Understat FastAPI facade without exposing its cache internals."""
 
     def __init__(self, base_url: str):
         parsed = urlsplit(base_url)
